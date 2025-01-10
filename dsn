@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# Check if the required arguments are provided
+if [ "$#" -lt 2 ]; then
+  echo "Usage: ./dsn <volume_name> <file_path>"
+  exit 1
+fi
+
+# Get the volume name and file path from arguments
+VOLUME_NAME="$1"
+FILE_PATH="$2"
+
+# Run the Docker container with the provided volume and file path
+docker run --rm -it -v "${VOLUME_NAME}:/data" thilina01/devshell sh -c "nano ${FILE_PATH}"

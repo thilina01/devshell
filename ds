@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# Check if the required arguments are provided
+if [ "$#" -lt 1 ]; then
+  echo "No volume provided. Running DevShell without mounting a volume."
+  docker run --rm -it thilina01/devshell
+  exit 0
+fi
+
+# Get the volume name from arguments
+VOLUME_NAME="$1"
+
+echo "== =================================== =="
+echo "Connecting to: ${VOLUME_NAME}"
+
+# Run the Docker container with the provided volume
+docker run --rm -it -v "${VOLUME_NAME}:/data" thilina01/devshell
