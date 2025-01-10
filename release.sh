@@ -54,4 +54,23 @@ else
   exit 1
 fi
 
+# Generate release notes based on commit messages
+CHANGELOG=$(git log "$LATEST_VERSION"..HEAD --pretty=format:"- %s (%h)")
+
+# Create a release using GitHub API
+if [ -n "$GITHUB_TOKEN" ]; then
+  curl -s -X POST "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" \
+    -H "Authorization: token ${GITHUB_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"tag_name\": \"$NEW_VERSION\",
+      \"name\": \"Release $NEW_VERSION\",
+      \"body\": \"## Changes\\n$CHANGELOG\\n\\n## Docker Images\\n- \`$REPO:latest\`\\n- \`$REPO:$NEW_VERSION\`\\n- \`$REPO:nano\`\\n- \`$REPO:$NEW_VERSION-nano\`\",
+      \"draft\": false,
+      \"prerelease\": false
+    }"
+else
+  echo "Error: GITHUB_TOKEN is not set. Skipping GitHub release creation."
+fi
+
 echo "Release $NEW_VERSION completed successfully!"
