@@ -31,6 +31,8 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Release Docker Images
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         chmod +x ./release.sh
         ./release.sh ${{ github.event.inputs.release_type }}
