@@ -43,6 +43,15 @@ docker push "$REPO:$NEW_VERSION-nano"
 
 # Tag the release in Git
 git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-git push origin "$NEW_VERSION"
+
+# Push the tag to GitHub
+if [ -n "$GITHUB_TOKEN" ]; then
+  git push https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git "$NEW_VERSION"
+elif [ -n "$PAT_TOKEN" ]; then
+  git push https://x-access-token:${PAT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git "$NEW_VERSION"
+else
+  echo "Error: No authentication token found. Set GITHUB_TOKEN or PAT_TOKEN."
+  exit 1
+fi
 
 echo "Release $NEW_VERSION completed successfully!"
