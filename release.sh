@@ -4,7 +4,7 @@
 REPO="thilina01/devshell"
 
 # Fetch the latest version from Git tags
-LATEST_VERSION=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null)
+LATEST_VERSION=$(git tag --sort=-v:refname | head -n 1)
 
 # Default to 0.0.0 if no tags exist
 if [ -z "$LATEST_VERSION" ]; then
