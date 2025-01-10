@@ -12,7 +12,7 @@ if [ -z "$LATEST_VERSION" ]; then
 fi
 
 # Parse the version components
-IFS='.' read -r MAJOR MINOR PATCH <<<"${LATEST_VERSION#v}"
+IFS='.' read -r MAJOR MINOR PATCH <<<"$LATEST_VERSION"
 
 # Determine the release type (major, minor, patch)
 if [ "$1" == "major" ]; then
@@ -30,6 +30,12 @@ fi
 # Create the new version
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 echo "Releasing new version: $NEW_VERSION"
+
+# Ensure the new tag doesn't already exist
+if git ls-remote --tags origin | grep -q "refs/tags/$NEW_VERSION"; then
+  echo "Error: Tag $NEW_VERSION already exists in the remote repository. Aborting."
+  exit 1
+fi
 
 # Build and tag the images
 docker build --target nano -t "$REPO:nano" -t "$REPO:$NEW_VERSION-nano" .
@@ -55,7 +61,12 @@ else
 fi
 
 # Generate release notes based on commit messages
-CHANGELOG=$(git log "$LATEST_VERSION"..HEAD --pretty=format:"- %s (%h)")
+if [ "$LATEST_VERSION" != "0.0.0" ]; then
+  CHANGELOG=$(git log "$LATEST_VERSION"..HEAD --pretty=format:"- %s (%h)")
+else
+  # Include all commits if no previous tag exists
+  CHANGELOG=$(git log --pretty=format:"- %s (%h)")
+fi
 
 # Create a release using GitHub API
 if [ -n "$GITHUB_TOKEN" ]; then
