@@ -3,6 +3,9 @@
 # Set image repository
 REPO="thilina01/devshell"
 
+# Ensure remote tags are fetched
+git fetch --tags
+
 # Fetch the latest version from Git tags
 LATEST_VERSION=$(git tag --sort=-v:refname | head -n 1)
 
