@@ -1,4 +1,9 @@
 # DevShell Docker Images
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/thilina01/devshell/docker-release.yml?branch=main)](https://github.com/thilina01/devshell/actions)  
+[![Latest Release](https://img.shields.io/github/v/release/thilina01/devshell)](https://github.com/thilina01/devshell/releases)  
+[![Docker Pulls](https://img.shields.io/docker/pulls/thilina01/devshell)](https://hub.docker.com/r/thilina01/devshell)  
+[![Docker Image Size (latest)](https://img.shields.io/docker/image-size/thilina01/devshell/latest)](https://hub.docker.com/r/thilina01/devshell)
+[![Docker Image Size (nano)](https://img.shields.io/docker/image-size/thilina01/devshell/nano)](https://hub.docker.com/r/thilina01/devshell)
 
 This repository contains two Docker images for lightweight development environments:
 - `thilina01/devshell:latest`: A full-featured development shell with Zsh, Oh My Zsh, Nano, syntax highlighting, and additional tools like `tmux`, `bat`, and `git`.
