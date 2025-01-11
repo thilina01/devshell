@@ -33,6 +33,7 @@ jobs:
     - name: Release Docker Images and GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DOCKER_REPOSITORY: "thilina01/devshell"
       run: |
         chmod +x ./release.sh
         ./release.sh ${{ github.event.inputs.release_type }}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Set image repository
-REPO="thilina01/devshell"
+REPO="$DOCKER_REPOSITORY"
 
 # Ensure remote tags are fetched
 git fetch --tags
