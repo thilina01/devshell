@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# Variables
+target_dir="$HOME/.local/bin/devshell"
+container_image="thilina01/devshell"
+marker="# Added by $container_image installer"
+
+# Functions
+add_to_path() {
+    local config_files=("$HOME/.bashrc" "$HOME/.zshrc")
+
+    # Check if target_dir is already in PATH
+    if [[ ":$PATH:" != *":$target_dir:"* ]]; then
+        export PATH="$target_dir:$PATH"
+        echo "PATH updated with $target_dir"
+    else
+        echo "PATH already contains $target_dir."
+    fi
+
+    # Ensure export line exists in each shell config file
+    for config_file in "${config_files[@]}"; do
+        if [[ -f "$config_file" ]]; then
+            if ! grep -Fxq "$marker" "$config_file"; then
+                echo "$marker" >> "$config_file"
+                echo "export PATH=\"$target_dir:\$PATH\" $marker" >> "$config_file"
+                echo "Added PATH export to $config_file"
+            else
+                echo "PATH export already exists in $config_file."
+            fi
+        fi
+    done
+}
+
+remove_from_path() {
+    local config_files=("$HOME/.bashrc" "$HOME/.zshrc")
+
+    # Escape special characters in the marker for safe use in sed
+    escaped_marker=$(printf '%s\n' "$marker" | sed 's:[\/&]:\\&:g')
+
+    # Use sed to delete the export line and any line containing the marker
+    for config_file in "${config_files[@]}"; do
+        if [[ -f "$config_file" ]]; then
+            sed -i "/$escaped_marker/d" "$config_file"
+            echo "Removed PATH export from $config_file"
+        fi
+    done
+
+    # Reload shell configurations if they exist
+    source "$HOME/.bashrc" &>/dev/null || true
+    source "$HOME/.zshrc" &>/dev/null || true
+
+    # Remove the directory from the current PATH
+    export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v "$target_dir" | tr '\n' ':' | sed 's/:$//')
+    echo "PATH cleanup completed."
+}
+
+install_files() {
+    # Create a temporary container
+    container_id=$(docker create "$container_image")
+
+    # Define files as a flat array
+    files=(
+        "/ds" "ds"
+        "/dsn" "dsn"
+    )
+
+    # Ensure target directory exists
+    mkdir -p "$target_dir"
+
+    # Loop through the files in pairs
+    for ((i = 0; i < ${#files[@]}; i += 2)); do
+        src="${files[i]}"
+        target_name="${files[i+1]}"
+        echo "Processing src: $src, target_name: $target_name"
+
+        if docker cp "$container_id:$src" "$target_dir/$target_name"; then
+            chmod +x "$target_dir/$target_name"
+            echo "$target_name installed to $target_dir"
+        else
+            echo "Failed to copy $src from the container. Skipping $target_name."
+        fi
+    done
+
+    # Clean up container
+    docker rm "$container_id" >/dev/null
+}
+
+uninstall_files() {
+    files=(ds dsn)
+
+    for file in "${files[@]}"; do
+        rm -f "$target_dir/$file"
+        echo "$file removed from $target_dir"
+    done
+
+    remove_from_path
+}
+
+handle_execution() {
+    # Check if the script is sourced or executed
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+        # Script is being sourced
+        if [[ "$1" == "-u" ]]; then
+            uninstall_files
+            echo "Uninstallation complete (sourced)."
+        else
+            add_to_path
+            echo "PATH updated (sourced)."
+        fi
+    else
+        # Script is being executed
+        if [[ "$1" == "-u" ]]; then
+            uninstall_files
+            echo "Uninstallation complete."
+        else
+            install_files
+            echo "File installation complete."
+        fi
+    fi
+}
+
+# Main Logic
+handle_execution "$@"

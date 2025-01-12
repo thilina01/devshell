@@ -12,6 +12,11 @@ RUN apk update && apk add --no-cache \
 RUN git clone https://github.com/scopatz/nanorc.git /root/.nano \
     && echo "include /root/.nano/*.nanorc" >> /root/.nanorc
 
+# Add installer, ds, and dsn scripts to the image
+COPY installer /installer
+COPY ds /ds
+COPY dsn /dsn
+
 # Set /data as a default working directory for editing
 WORKDIR /data
 
@@ -52,7 +57,7 @@ RUN echo "source /root/.zshrc" >> /root/.zshenv
 CMD ["/bin/zsh"]
 
 # docker build --target nano -t thilina01/devshell:nano .
-# docker build -t thilina01/devshell:nano .
+# docker build -t thilina01/devshell:latest .
 
 # docker image ls thilina01/devshell:latest
 # docker image ls thilina01/devshell:nano
@@ -65,3 +70,6 @@ CMD ["/bin/zsh"]
 
 # docker run --rm -it -v openresty_config:/data thilina01/devshell:latest
 # docker run --rm -it -v openresty_config:/data thilina01/devshell:nano sh -c "nano system_config.json"
+
+# docker run --rm thilina01/devshell cat /installer > installer && chmod +x installer && ./installer && source ./installer
+# docker run --rm thilina01/devshell cat /installer > installer && chmod +x installer && ./installer -u

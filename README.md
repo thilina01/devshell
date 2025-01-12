@@ -112,6 +112,31 @@ tmux
 ```
 git clone https://github.com/example/repo.git
 ```
+
+## Using the Installer Script
+
+### Overview
+The installer script simplifies the setup process by installing helper scripts (`ds` and `dsn`), updating the system PATH, and making these commands globally accessible.
+
+### Installation
+To install the helper scripts and configure your environment:
+```
+docker run --rm thilina01/devshell cat /installer > installer && chmod +x installer && ./installer && source ./installer
+```
+
+### Uninstallation
+To remove the installed scripts and cleanup the PATH:
+```
+./installer -u
+```
+
+### Installer Behavior
+- The script automatically installs helper scripts (`ds` and `dsn`) to `$HOME/.local/bin/devshell`.
+- Updates the `PATH` variable in the current session and shell configuration files (`.bashrc` and `.zshrc`).
+- Prevents duplicate PATH entries during installation.
+- During uninstallation, removes all associated files and PATH entries.
+
+
 ## Using the `ds` and `dsn` Scripts
 
 To simplify running these containers, two helper scripts are provided:
@@ -138,9 +163,9 @@ The `ds` script starts a DevShell session. It supports running with or without a
   ./ds
   ```
 
-- Start a DevShell session with the `openresty_config` volume:
+- Start a DevShell session with the `demo_config` volume:
   ```
-  ./ds openresty_config
+  ./ds demo_config
   ```
 
 ### `dsn`: Edit a File with Nano
@@ -153,11 +178,11 @@ The `dsn` script opens a specific file in Nano inside the container.
 
 #### Example:
 ```
-./dsn openresty_config system_config.json
+./dsn demo_config system_config.json
 ```
-This will mount the `openresty_config` volume and open `system_config.json` for editing in Nano.
+This will mount the `demo_config` volume and open `system_config.json` for editing in Nano.
 
-### Add Scripts to PATH
+### Add Scripts to PATH Manually
 To use `ds` and `dsn` globally, move them to `/usr/local/bin`:
 ```
 sudo mv ds /usr/local/bin/
@@ -168,8 +193,8 @@ sudo chmod +x /usr/local/bin/ds /usr/local/bin/dsn
 Now you can run:
 ```
 ds
-ds openresty_config
-dsn openresty_config system_config.json
+ds demo_config
+dsn demo_config system_config.json
 ```
 
 ## Contributions
