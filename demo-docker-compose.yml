@@ -1,0 +1,44 @@
+version: '3.9'
+
+networks:
+  shared-network:
+    driver: overlay
+
+volumes:
+  web-service-1-data:
+  web-service-2-data:
+
+services:
+  web-service-1:
+    image: nginx:alpine
+    ports:
+      - "8081:80"
+    volumes:
+      - web-service-1-data:/usr/share/nginx/html
+    networks:
+      - shared-network
+    deploy:
+      replicas: 1
+
+  web-service-2:
+    image: httpd:alpine
+    ports:
+      - "8082:80"
+    volumes:
+      - web-service-2-data:/usr/local/apache2/htdocs
+    networks:
+      - shared-network
+    deploy:
+      replicas: 1
+
+  devshell:
+    image: thilina01/devshell
+    networks:
+      - shared-network
+    volumes:
+      - web-service-1-data:/data/web-service-1
+      - web-service-2-data:/data/web-service-2
+    stdin_open: true  # Keep STDIN open for interactive exec
+    tty: true         # Allocate a TTY
+    deploy:
+      replicas: 0     # On-demand service
