@@ -1,17 +1,177 @@
 #!/usr/bin/env bash
 
-# Check if the required arguments are provided
-if [ "$#" -lt 1 ]; then
-  echo "No volume provided. Running DevShell without mounting a volume."
-  docker run --rm -it thilina01/devshell
-  exit 0
+# ==============================
+# Configurable Variables
+# ==============================
+DEFAULT_IMAGE="thilina01/devshell" # Default Docker image
+CONFIG_FILE="./ds.conf" # Path to optional configuration file
+LOG_FILE="$HOME/ds.log" # Log file path
+
+# Load configuration file if it exists
+[ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
+
+# ==============================
+# Functions
+# ==============================
+
+# Function to log messages
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Function to display usage instructions
+usage() {
+    echo "Usage:"
+    echo "  $0 -s <service_name>               # Manage a Docker service (start, attach, monitor idle, and stop)"
+    echo "  $0 -v <volume_name> [-n <network>] # Run a container with a volume and optional network"
+    echo "  $0 -n <network>                    # Run a container connected to a network without a volume"
+    echo "  $0 -i <image_name>                 # Specify a custom Docker image (default: $DEFAULT_IMAGE)"
+    echo "  $0                                 # Run a container without volumes or network"
+    echo "  $0 -h | --help                     # Display this help message"
+    exit 1
+}
+
+# Function to perform cleanup on script exit
+cleanup() {
+    log_message "Script interrupted. Cleaning up..."
+    [ -n "$SERVICE_NAME" ] && stop_service
+    exit 1
+}
+
+# Trap interrupts and cleanup
+trap cleanup SIGINT SIGTERM
+
+# Function to list current status of services and containers
+list_status() {
+    log_message "Listing all running services and containers:"
+    docker stack ls
+    docker service ls
+    docker ps
+    exit 0
+}
+
+# Function to manage a service
+manage_service() {
+    log_message "Managing service: $SERVICE_NAME"
+
+    # Function to check if the service exists
+    does_service_exist() {
+        docker service ls --format "{{.Name}}" | grep -w "$SERVICE_NAME" > /dev/null 2>&1
+        return $?
+    }
+
+    # Function to check if the service is running
+    is_service_running() {
+        docker service ps --filter "desired-state=running" "$SERVICE_NAME" | grep "Running" > /dev/null 2>&1
+        return $?
+    }
+
+    # Function to start the service
+    start_service() {
+        log_message "Starting service: $SERVICE_NAME"
+        docker service scale "$SERVICE_NAME=1" > /dev/null
+
+        # Wait for the service to have at least one running task
+        log_message "Waiting for service $SERVICE_NAME to start..."
+        while true; do
+            # Check if there is at least one running task
+            RUNNING_TASKS=$(docker service ps "$SERVICE_NAME" --filter "desired-state=running" --format "{{.CurrentState}}" | grep "Running" | wc -l)
+            
+            if [ "$RUNNING_TASKS" -gt 0 ]; then
+                log_message "Service $SERVICE_NAME is up and running."
+                break
+            fi
+
+            # Wait for a short interval before re-checking
+            sleep 1
+        done
+    }
+
+    # Function to stop the service
+    stop_service() {
+        log_message "Stopping service: $SERVICE_NAME"
+        docker service scale "$SERVICE_NAME=0" > /dev/null
+    }
+
+    # Function to attach to the container
+    attach_to_container() {
+        CONTAINER_ID=$(docker ps --filter "name=$SERVICE_NAME" --format "{{.ID}}" | head -n 1)
+        if [ -z "$CONTAINER_ID" ]; then
+            log_message "No running container found for service $SERVICE_NAME"
+            exit 1
+        fi
+
+        log_message "Attaching to container: $CONTAINER_ID"
+        docker exec -it "$CONTAINER_ID" /bin/zsh
+    }
+
+    # Check if the service exists
+    if ! does_service_exist; then
+        log_message "Error: Service $SERVICE_NAME does not exist."
+        exit 1
+    fi
+
+    # Start the service if not running
+    if ! is_service_running; then
+        start_service
+    fi
+
+    # Attach to the container and stop the service when done
+    attach_to_container
+    stop_service
+    exit 0
+}
+
+
+# Function to run a container with volume and/or network
+run_container() {
+    DOCKER_RUN_CMD="docker run --rm -it"
+    if [ -n "$VOLUME_NAME" ]; then
+        log_message "Running container with volume: $VOLUME_NAME"
+        DOCKER_RUN_CMD+=" -v ${VOLUME_NAME}:/data"
+    fi
+    if [ -n "$NETWORK_NAME" ]; then
+        log_message "Connecting container to network: $NETWORK_NAME"
+        DOCKER_RUN_CMD+=" --network ${NETWORK_NAME}"
+    fi
+    log_message "Executing: $DOCKER_RUN_CMD $IMAGE"
+    $DOCKER_RUN_CMD $IMAGE
+    exit 0
+}
+
+# Function to run a container without volume or network
+run_simple_container() {
+    log_message "Running container without volumes or network."
+    docker run --rm -it $IMAGE
+    exit 0
+}
+
+# ==============================
+# Main Logic
+# ==============================
+
+SERVICE_NAME=""
+VOLUME_NAME=""
+NETWORK_NAME=""
+IMAGE="$DEFAULT_IMAGE"
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -s) SERVICE_NAME="$2"; shift ;;
+        -v) VOLUME_NAME="$2"; shift ;;
+        -n) NETWORK_NAME="$2"; shift ;;
+        -i) IMAGE="$2"; shift ;;
+        -l|--list) list_status ;;
+        -h|--help) usage ;;
+        *) echo "Unknown option: $1"; usage ;;
+    esac
+    shift
+done
+
+if [ -n "$SERVICE_NAME" ]; then
+    manage_service
+elif [ -n "$VOLUME_NAME" ] || [ -n "$NETWORK_NAME" ]; then
+    run_container
+else
+    run_simple_container
 fi
-
-# Get the volume name from arguments
-VOLUME_NAME="$1"
-
-echo "== =================================== =="
-echo "Connecting to: ${VOLUME_NAME}"
-
-# Run the Docker container with the provided volume
-docker run --rm -it -v "${VOLUME_NAME}:/data" thilina01/devshell
