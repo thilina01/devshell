@@ -32,6 +32,7 @@ RUN apk add --no-cache \
     tmux \
     bat \
     curl \
+    curlie \
     wget \
     && rm -rf /var/cache/apk/*
 
