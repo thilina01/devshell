@@ -71,13 +71,13 @@ docker run -it --rm thilina01/devshell:latest
 #### Nano Version
 Edit a specific file within a mounted volume:
 ```
-docker run --rm -it -v openresty_config:/data thilina01/devshell:nano sh -c "nano system_config.json"
+docker run --rm -it -v demo_config:/data thilina01/devshell:nano sh -c "nano system_config.json"
 ```
 
 #### DevShell Version
 Start a full-featured shell with a mounted volume:
 ```
-docker run --rm -it -v openresty_config:/data thilina01/devshell:latest
+docker run --rm -it -v demo_config:/data thilina01/devshell:latest
 ```
 
 ## Example Commands Inside the DevShell Container
@@ -196,6 +196,108 @@ ds
 ds demo_config
 dsn demo_config system_config.json
 ```
+
+# Demonstrating the devshell usage using the demo stack
+
+ Here’s a **comprehensive set of use cases** for the ds script using the `demo-docker-compose.yml` stack:
+
+### **0. starting the stack and services**
+
+#### **0.1. deploy the stack**
+
+```bash
+docker stack deploy -c demo-docker-compose.yml demo
+```
+this will deploy the stack as demo and starts the two web services, `web-service-1`, and `web-service-2`. 
+the `devshell` will not be started automatically as the replica count is set to `0`
+ 
+### **1. Debugging and Inspecting Web Services**
+
+#### **1.1. Inspect `web-service-1` Volume**
+- Scenario: You need to check or modify files in the `web-service-1` volume.
+  
+Commands:
+```bash
+# Start the devshell service on-demand
+./ds -s demo_devshell
+
+# Once inside the devshell container, navigate to the volume
+cd /data/web-service-1
+
+# List files in the volume
+ls -la
+
+# Modify a file (example: editing an HTML file)
+echo "<h1>Hello from DevShell</h1>" > index.html
+
+# Exit the container (triggers idle timeout monitoring)
+exit
+```
+
+Outcome:
+- The `devshell` service is stopped after exit.
+
+---
+
+#### **1.2. Check Network Connectivity Between Services**
+- Scenario: Verify that `web-service-1` and `web-service-2` can communicate over the shared network.
+
+Commands:
+```bash
+# Start the devshell service
+./ds -s demo_devshell
+
+# Ping web-service-1 from inside devshell
+ping -c 4 web-service-1
+
+# Ping web-service-2 from inside devshell
+ping -c 4 web-service-2
+
+# Use curl to check web-service-1 from devshell
+curl http://web-service-1
+
+# Use curl to check web-service-2 from devshell
+curl http://web-service-2
+
+# Exit the container
+exit
+```
+
+Outcome:
+- Confirms network connectivity between the services.
+
+---
+
+### **2. Maintenance Tasks**
+
+#### **2.1. Perform Updates on Shared Volumes**
+- Scenario: Update files for both web services via shared volumes.
+
+Commands:
+```bash
+# Start the devshell service
+./ds -s demo_devshell
+
+# Update files in web-service-1's volume
+cd /data/web-service-1
+echo "<p>Updated content for web-service-1</p>" > index.html
+
+# Update files in web-service-2's volume
+cd /data/web-service-2
+echo "<p>Updated content for web-service-2</p>" > index.html
+
+# Use curl to verify the update on HTTP endpoints
+curl http://web-service-1
+curl http://web-service-2
+
+# Exit the container
+exit
+```
+
+Outcome:
+- Files in the shared volumes are updated, and changes reflect in the web services.
+
+---
 
 ## Contributions
 
