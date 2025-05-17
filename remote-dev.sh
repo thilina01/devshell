@@ -69,8 +69,11 @@ ensure_encrypted_credentials() {
 
   if [[ ! -f "$VPN_CONFIG_FILE" ]]; then
     echo "🔐 VPN config file not found. Creating..."
-    echo "Paste your .ovpn config (Ctrl+D to end):"
-    read -r -d '' vpn_config || true
+    echo "📥 Paste your .ovpn config below, followed by Ctrl+D:" >&2
+    vpn_config=""
+    while IFS= read -r line; do
+      vpn_config+="${line}"$'\n'
+    done
     created=true
   fi
 
