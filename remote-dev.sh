@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 CONFIG_FILE="./remote-dev.conf"
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-RUNTIME=""
+# Detect container runtime
 if command -v docker &> /dev/null; then
   RUNTIME="docker"
 elif command -v podman &> /dev/null; then
@@ -47,56 +47,56 @@ else
   exit 1
 fi
 
+# Handle VPN credentials and config securely
 DECRYPTED_TEMP_VPN_PASS=$(mktemp)
 DECRYPTED_TEMP_OVPN=$(mktemp)
 
+cleanup() {
+  rm -f "$DECRYPTED_TEMP_VPN_PASS" "$DECRYPTED_TEMP_OVPN"
+}
+trap cleanup EXIT
+
 ensure_encrypted_credentials() {
-  local created_any=false
+  local created=false
 
   if [[ ! -f "$VPN_PASSWORD_FILE" ]]; then
     echo "🔐 VPN password file not found. Creating..."
     read -rp "VPN Username: " vpn_user
     read -rsp "VPN Password: " vpn_pass
     echo
-    created_any=true
+    created=true
   fi
 
   if [[ ! -f "$VPN_CONFIG_FILE" ]]; then
     echo "🔐 VPN config file not found. Creating..."
-    echo "Paste your .ovpn config, followed by Ctrl+D:" >&2
+    echo "Paste your .ovpn config (Ctrl+D to end):"
     read -r -d '' vpn_config || true
-    created_any=true
+    created=true
   fi
 
-  if $created_any; then
+  if $created; then
     read -rsp "🔑 Enter passphrase to encrypt: " passphrase
     echo
 
-    if [[ -n "$vpn_user" && -n "$vpn_pass" ]]; then
-      echo -e "$vpn_user\n$vpn_pass" | \
-        openssl enc -aes-256-cbc -pbkdf2 -salt -out "$VPN_PASSWORD_FILE" -pass pass:"$passphrase"
-      echo "✅ Encrypted VPN credentials saved to $VPN_PASSWORD_FILE"
-    fi
+    [[ -n "${vpn_user:-}" && -n "${vpn_pass:-}" ]] && \
+      echo -e "$vpn_user\n$vpn_pass" | openssl enc -aes-256-cbc -pbkdf2 -salt -out "$VPN_PASSWORD_FILE" -pass pass:"$passphrase"
 
-    if [[ -n "$vpn_config" ]]; then
-      echo "$vpn_config" | \
-        openssl enc -aes-256-cbc -pbkdf2 -salt -out "$VPN_CONFIG_FILE" -pass pass:"$passphrase"
-      echo "✅ Encrypted VPN config saved to $VPN_CONFIG_FILE"
-    fi
+    [[ -n "${vpn_config:-}" ]] && \
+      echo "$vpn_config" | openssl enc -aes-256-cbc -pbkdf2 -salt -out "$VPN_CONFIG_FILE" -pass pass:"$passphrase"
   else
     read -rsp "🔑 Enter passphrase to decrypt credentials: " passphrase
     echo
   fi
 
-  if ! openssl enc -d -aes-256-cbc -pbkdf2 -in "$VPN_PASSWORD_FILE" -pass pass:"$passphrase" -out "$DECRYPTED_TEMP_VPN_PASS"; then
-    echo "❌ Failed to decrypt VPN password file."
+  openssl enc -d -aes-256-cbc -pbkdf2 -in "$VPN_PASSWORD_FILE" -pass pass:"$passphrase" -out "$DECRYPTED_TEMP_VPN_PASS" || {
+    echo "❌ Failed to decrypt VPN password."
     exit 1
-  fi
+  }
 
-  if ! openssl enc -d -aes-256-cbc -pbkdf2 -in "$VPN_CONFIG_FILE" -pass pass:"$passphrase" -out "$DECRYPTED_TEMP_OVPN"; then
-    echo "❌ Failed to decrypt VPN config file."
+  openssl enc -d -aes-256-cbc -pbkdf2 -in "$VPN_CONFIG_FILE" -pass pass:"$passphrase" -out "$DECRYPTED_TEMP_OVPN" || {
+    echo "❌ Failed to decrypt VPN config."
     exit 1
-  fi
+  }
 }
 
 start_container() {
@@ -106,9 +106,10 @@ start_container() {
   $RUNTIME run -d --rm \
     --name "$CONTAINER_NAME" \
     --privileged \
-    -p $PORT_SSH:22 \
-    -p $PORT_SSH_FORWARD:2222 \
-    -p $PORT_CODE_SERVER:7777 \
+    --cap-add=NET_ADMIN \
+    -p "$PORT_SSH:22" \
+    -p "$PORT_SSH_FORWARD:2222" \
+    -p "$PORT_CODE_SERVER:7777" \
     -e VPN_CONFIG_PATH="/etc/openvpn/vpn-config.ovpn" \
     -e REMOTE_SSH_HOST="$REMOTE_HOST" \
     -e REMOTE_SSH_PORT="22" \
@@ -116,65 +117,60 @@ start_container() {
     -e REMOTE_CODE_SERVER_PORT="7777" \
     -e SSH_USER="$SSH_USER" \
     -e SSH_PASSWORD="$SSH_PASSWORD" \
-    -v "$DECRYPTED_TEMP_OVPN":/etc/openvpn/vpn-config.ovpn:ro \
-    -v "$DECRYPTED_TEMP_VPN_PASS":/tmp/vpn_password:ro \
+    -v "$DECRYPTED_TEMP_OVPN:/etc/openvpn/vpn-config.ovpn:ro" \
+    -v "$DECRYPTED_TEMP_VPN_PASS:/tmp/vpn_password:ro" \
     "$IMAGE_NAME"
 
-  echo "✅ Container started. You can now SSH with:"
-  echo "   ssh $SSH_USER@localhost -p $PORT_SSH_FORWARD"
+  echo "✅ Container started."
+  echo "🔐 SSH: ssh $SSH_USER@localhost -p $PORT_SSH_FORWARD"
   echo "🌐 Code Server: http://localhost:$PORT_CODE_SERVER"
 }
 
+stop_container() {
+  echo "🛑 Stopping container..."
+  $RUNTIME stop "$CONTAINER_NAME" 2>/dev/null || echo "⚠️ Already stopped or not found."
+}
+
 ssh_connect() {
-  echo "🔐 Waiting for SSH server to become available on port $PORT_SSH_FORWARD..."
+  echo "🔍 Waiting for port $PORT_SSH_FORWARD to become available..."
 
   for i in {1..30}; do
-    if nc -z localhost $PORT_SSH_FORWARD 2>/dev/null; then
-      echo "✅ Port $PORT_SSH_FORWARD is open! Attempting SSH connection..."
+    if nc -z localhost "$PORT_SSH_FORWARD" 2>/dev/null; then
+      echo "✅ Port is open. Connecting SSH..."
       ssh-keygen -R "[localhost]:$PORT_SSH_FORWARD" >/dev/null 2>&1
 
       for j in {1..10}; do
         printf "\r🔁 SSH attempt %d..." "$j"
-        SSH_LOG=$(mktemp)
-        if ssh -o StrictHostKeyChecking=accept-new "$SSH_USER@localhost" -p "$PORT_SSH_FORWARD" 2>"$SSH_LOG"; then
-          echo -e "\r✅ SSH connected on attempt $j.                        "
+        if ssh -o StrictHostKeyChecking=accept-new "$SSH_USER@localhost" -p "$PORT_SSH_FORWARD"; then
+          echo -e "\r✅ SSH connected.                          "
           lazy_stop &
           wait $!
-          rm -f "$SSH_LOG"
           return
         fi
         sleep 2
         printf "."
       done
 
-      echo -e "\n❌ SSH connection failed. Last error:"
-      cat "$SSH_LOG"
-      rm -f "$SSH_LOG"
+      echo -e "\n❌ SSH connection failed after multiple attempts."
       exit 1
     else
-      echo "⏳ Waiting for port... ($i/30)"
+      echo "⏳ Waiting... ($i/30)"
       sleep 1
     fi
   done
 
-  echo "❌ Timeout waiting for port $PORT_SSH_FORWARD to open."
+  echo "❌ Timeout: port $PORT_SSH_FORWARD is not open."
   exit 1
 }
 
 lazy_stop() {
   echo "👋 SSH session ended. Cleaning up..."
   stop_container
-  rm -f "$DECRYPTED_TEMP_VPN_PASS" "$DECRYPTED_TEMP_OVPN"
-}
-
-stop_container() {
-  echo "🛑 Stopping $APP_NAME container..."
-  $RUNTIME stop "$CONTAINER_NAME" || echo "Already stopped"
 }
 
 connect() {
   if ! $RUNTIME ps --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
-    echo "🚀 Container not running. Starting..."
+    echo "🔧 Container not running. Starting..."
     start_container
     sleep 3
   fi
@@ -183,15 +179,15 @@ connect() {
 
 vscode() {
   if ! $RUNTIME ps --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
-    echo "🚀 Container not running. Starting..."
+    echo "🔧 Container not running. Starting..."
     start_container
     sleep 3
   fi
-  echo "🖥️  Opening VSCode remote session (you will be prompted to pick a folder)..."
+  echo "🖥️  Launching VSCode SSH session..."
   code --new-window --remote "ssh-remote+$SSH_USER@localhost:$PORT_SSH_FORWARD"
 }
 
-# Main
+# Dispatcher
 case "$COMMAND" in
   start)
     start_container
