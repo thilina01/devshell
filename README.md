@@ -27,27 +27,25 @@ This repository contains two Docker images for lightweight development environme
 
   * Zsh with Oh My Zsh and plugins (`zsh-autosuggestions` and `zsh-syntax-highlighting`).
   * Additional tools like `tmux`, `bat`, `curl`, `wget`, and `git`.
-  * Optional VSCode Remote-SSH integration for editing inside the container.
+* Suitable for full-featured development and scripting tasks.
 
 ## Build Instructions
 
-To build the images:
-
 ### Build the Nano Version
 
-```bash
+```
 docker build --target nano -t thilina01/devshell:nano .
 ```
 
 ### Build the Full DevShell Version
 
-```bash
+```
 docker build -t thilina01/devshell .
 ```
 
 ### Verify Images
 
-```bash
+```
 docker image ls thilina01/devshell:latest
 docker image ls thilina01/devshell:nano
 ```
@@ -56,7 +54,7 @@ docker image ls thilina01/devshell:nano
 
 Push the images to Docker Hub:
 
-```bash
+```
 docker push thilina01/devshell:latest
 docker push thilina01/devshell:nano
 ```
@@ -67,7 +65,7 @@ docker push thilina01/devshell:nano
 
 Run the Nano-specific container:
 
-```bash
+```
 docker run -it --rm thilina01/devshell:nano
 ```
 
@@ -75,7 +73,7 @@ docker run -it --rm thilina01/devshell:nano
 
 Run the full-featured DevShell container:
 
-```bash
+```
 docker run -it --rm thilina01/devshell:latest
 ```
 
@@ -85,7 +83,7 @@ docker run -it --rm thilina01/devshell:latest
 
 Edit a specific file within a mounted volume:
 
-```bash
+```
 docker run --rm -it -v demo_config:/data thilina01/devshell:nano sh -c "nano system_config.json"
 ```
 
@@ -93,7 +91,7 @@ docker run --rm -it -v demo_config:/data thilina01/devshell:nano sh -c "nano sys
 
 Start a full-featured shell with a mounted volume:
 
-```bash
+```
 docker run --rm -it -v demo_config:/data thilina01/devshell:latest
 ```
 
@@ -103,7 +101,7 @@ docker run --rm -it -v demo_config:/data thilina01/devshell:latest
 
 * Enjoy features like autosuggestions and syntax highlighting:
 
-```bash
+```
 git status
 echo "Hello, DevShell!"
 ```
@@ -112,7 +110,7 @@ echo "Hello, DevShell!"
 
 * Use Nano with syntax highlighting:
 
-```bash
+```
 nano /data/system_config.json
 ```
 
@@ -120,7 +118,7 @@ nano /data/system_config.json
 
 * Use `bat` for enhanced file viewing:
 
-```bash
+```
 bat /etc/passwd
 ```
 
@@ -128,7 +126,7 @@ bat /etc/passwd
 
 * Start a `tmux` session:
 
-```bash
+```
 tmux
 ```
 
@@ -136,7 +134,7 @@ tmux
 
 * Use Git to manage repositories:
 
-```bash
+```
 git clone https://github.com/example/repo.git
 ```
 
@@ -150,7 +148,7 @@ The installer script simplifies the setup process by installing helper scripts (
 
 To install the helper scripts and configure your environment:
 
-```bash
+```
 docker run --rm thilina01/devshell cat /installer > installer && chmod +x installer && ./installer && source ./installer
 ```
 
@@ -158,7 +156,7 @@ docker run --rm thilina01/devshell cat /installer > installer && chmod +x instal
 
 To remove the installed scripts and cleanup the PATH:
 
-```bash
+```
 ./installer -u
 ```
 
@@ -181,7 +179,7 @@ The `ds` script starts a DevShell session. It supports running with or without a
 
 * Run without a volume:
 
-  ```bash
+  ```
   ./ds
   ```
 
@@ -189,7 +187,7 @@ The `ds` script starts a DevShell session. It supports running with or without a
 
 * Run with a volume:
 
-  ```bash
+  ```
   ./ds <volume_name>
   ```
 
@@ -199,13 +197,13 @@ The `ds` script starts a DevShell session. It supports running with or without a
 
 * Start a DevShell session without a volume:
 
-  ```bash
+  ```
   ./ds
   ```
 
 * Start a DevShell session with the `demo_config` volume:
 
-  ```bash
+  ```
   ./ds demo_config
   ```
 
@@ -215,13 +213,13 @@ The `dsn` script opens a specific file in Nano inside the container.
 
 #### Usage:
 
-```bash
+```
 ./dsn <volume_name> <file_path>
 ```
 
 #### Example:
 
-```bash
+```
 ./dsn demo_config system_config.json
 ```
 
@@ -231,7 +229,7 @@ This will mount the `demo_config` volume and open `system_config.json` for editi
 
 To use `ds` and `dsn` globally, move them to `/usr/local/bin`:
 
-```bash
+```
 sudo mv ds /usr/local/bin/
 sudo mv dsn /usr/local/bin/
 sudo chmod +x /usr/local/bin/ds /usr/local/bin/dsn
@@ -239,36 +237,151 @@ sudo chmod +x /usr/local/bin/ds /usr/local/bin/dsn
 
 Now you can run:
 
-```bash
+```
 ds
 ds demo_config
 dsn demo_config system_config.json
 ```
 
-## Using the `vscode` Command (Remote Editing via VSCode)
+## Enhanced Remote Dev Experience with `remote-dev.sh` and VSCode
 
-The enhanced script provides a `vscode` command that allows you to open a **Remote-SSH session into the running DevShell container using VSCode**, with an improved user experience:
+A new helper script `remote-dev.sh` supports a full-featured remote dev experience with SSH and optional VPN support. Enhancements include:
 
-* If no VSCode window is running, it will launch a new window and allow you to choose a folder.
-* If VSCode is already open, it will still open a **new window** via Remote SSH (does not reuse an existing window).
-* No manual folder prompts — VSCode’s built-in folder selector appears automatically.
+* **Auto-starting** containers with SSH and VPN.
+* **Encrypted VPN credentials/configs** with a unified passphrase.
+* **Automatic SSH readiness detection**.
+* **New VSCode integration**:
 
-### Prerequisites
+  * Launches a VSCode window using `code --remote ssh-remote+...`.
+  * Supports folder selection UI if VSCode is already running.
+  * Works even with running VSCode by spawning a new window with `--new-window`.
 
-* VSCode must be installed on the host machine.
-* Remote-SSH extension must be installed in VSCode.
-* `code` command must be available in your shell (e.g., `which code`).
-
-### Example
+#### Usage:
 
 ```bash
-./remote-dev.sh vscode
+./remote-dev.sh start        # Starts the container with VPN/SSH setup
+./remote-dev.sh vscode       # Launches a new VSCode remote session
+./remote-dev.sh stop         # Stops and cleans up the container
 ```
 
-This opens a new VSCode window and lets you choose a folder inside the DevShell container running on a forwarded SSH port.
-
-> 💡 The `vscode` integration is designed to work seamlessly with both newly launched containers and already running containers.
+---
 
 # Demonstrating the devshell usage using the demo stack
 
-\[Remaining sections unchanged from original]
+Here’s a **comprehensive set of use cases** for the ds script using the `demo-docker-compose.yml` stack:
+
+### **0. starting the stack and services**
+
+#### **0.1. deploy the stack**
+
+```bash
+docker stack deploy -c demo-docker-compose.yml demo
+```
+
+this will deploy the stack as demo and starts the two web services, `web-service-1`, and `web-service-2`.
+the `devshell` will not be started automatically as the replica count is set to `0`
+
+### **1. Debugging and Inspecting Web Services**
+
+#### **1.1. Inspect `web-service-1` Volume**
+
+* Scenario: You need to check or modify files in the `web-service-1` volume.
+
+Commands:
+
+```bash
+# Start the devshell service on-demand
+./ds -s demo_devshell
+
+# Once inside the devshell container, navigate to the volume
+cd /data/web-service-1
+
+# List files in the volume
+ls -la
+
+# Modify a file (example: editing an HTML file)
+echo "<h1>Hello from DevShell</h1>" > index.html
+
+# Exit the container (triggers idle timeout monitoring)
+exit
+```
+
+Outcome:
+
+* The `devshell` service is stopped after exit.
+
+---
+
+#### **1.2. Check Network Connectivity Between Services**
+
+* Scenario: Verify that `web-service-1` and `web-service-2` can communicate over the shared network.
+
+Commands:
+
+```bash
+# Start the devshell service
+./ds -s demo_devshell
+
+# Ping web-service-1 from inside devshell
+ping -c 4 web-service-1
+
+# Ping web-service-2 from inside devshell
+ping -c 4 web-service-2
+
+# Use curl to check web-service-1 from devshell
+curl http://web-service-1
+
+# Use curl to check web-service-2 from devshell
+curl http://web-service-2
+
+# Exit the container
+exit
+```
+
+Outcome:
+
+* Confirms network connectivity between the services.
+
+---
+
+### **2. Maintenance Tasks**
+
+#### **2.1. Perform Updates on Shared Volumes**
+
+* Scenario: Update files for both web services via shared volumes.
+
+Commands:
+
+```bash
+# Start the devshell service
+./ds -s demo_devshell
+
+# Update files in web-service-1's volume
+cd /data/web-service-1
+echo "<p>Updated content for web-service-1</p>" > index.html
+
+# Update files in web-service-2's volume
+cd /data/web-service-2
+echo "<p>Updated content for web-service-2</p>" > index.html
+
+# Use curl to verify the update on HTTP endpoints
+curl http://web-service-1
+curl http://web-service-2
+
+# Exit the container
+exit
+```
+
+Outcome:
+
+* Files in the shared volumes are updated, and changes reflect in the web services.
+
+---
+
+## Contributions
+
+Feel free to submit issues or pull requests for improvements and additional features.
+
+## License
+
+This project is licensed under the MIT License.
