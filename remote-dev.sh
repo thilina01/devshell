@@ -51,6 +51,12 @@ fi
 DECRYPTED_TEMP_VPN_PASS=$(mktemp)
 DECRYPTED_TEMP_OVPN=$(mktemp)
 
+# Persistent SSH host key
+HOST_KEY_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/remote-dev/ssh"
+mkdir -p "$HOST_KEY_DIR"
+SSH_HOST_KEY="$HOST_KEY_DIR/ssh_host_rsa_key"
+SSH_CONFIG_FILE="$HOME/.ssh/config"
+
 cleanup() {
   rm -f "$DECRYPTED_TEMP_VPN_PASS" "$DECRYPTED_TEMP_OVPN"
 }
@@ -102,8 +108,36 @@ ensure_encrypted_credentials() {
   }
 }
 
+setup_persistent_ssh_key() {
+  if [[ ! -f "$SSH_HOST_KEY" ]]; then
+    echo "🔐 Generating persistent SSH host key..."
+    ssh-keygen -f "$SSH_HOST_KEY" -N '' -t rsa
+  fi
+}
+
+setup_ssh_config() {
+  mkdir -p "$(dirname "$SSH_CONFIG_FILE")"
+  touch "$SSH_CONFIG_FILE"
+  chmod 600 "$SSH_CONFIG_FILE"
+
+  if ! grep -q "Host remote-dev" "$SSH_CONFIG_FILE"; then
+    echo "🛠️  Adding remote-dev SSH config entry..."
+    cat <<EOF >> "$SSH_CONFIG_FILE"
+
+Host remote-dev
+  HostName localhost
+  Port $PORT_SSH_FORWARD
+  User $SSH_USER
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+EOF
+  fi
+}
+
 start_container() {
   ensure_encrypted_credentials
+  setup_persistent_ssh_key
+  setup_ssh_config
 
   echo "🚀 Starting $APP_NAME container with $RUNTIME..."
   $RUNTIME run -d --rm \
@@ -122,6 +156,8 @@ start_container() {
     -e SSH_PASSWORD="$SSH_PASSWORD" \
     -v "$DECRYPTED_TEMP_OVPN:/etc/openvpn/vpn-config.ovpn:ro" \
     -v "$DECRYPTED_TEMP_VPN_PASS:/tmp/vpn_password:ro" \
+    -v "$SSH_HOST_KEY:/etc/ssh/ssh_host_rsa_key:ro" \
+    -v "$SSH_HOST_KEY.pub:/etc/ssh/ssh_host_rsa_key.pub:ro" \
     "$IMAGE_NAME"
 
   echo "✅ Container started."
@@ -184,10 +220,10 @@ vscode() {
   if ! $RUNTIME ps --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
     echo "🔧 Container not running. Starting..."
     start_container
-    sleep 3
+    sleep 15
   fi
   echo "🖥️  Launching VSCode SSH session..."
-  code --new-window --remote "ssh-remote+$SSH_USER@localhost:$PORT_SSH_FORWARD"
+  code --new-window --remote "ssh-remote+remote-dev"
 }
 
 # Dispatcher
