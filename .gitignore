@@ -1,2 +1,14 @@
 vpn_password.enc
 vpn-config.ovpn.enc
+
+# --- Cross-repo hygiene baseline (OS junk, editor/IDE, env files) ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.env
+.env.local
+.env.*.local
